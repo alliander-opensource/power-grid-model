@@ -49,9 +49,9 @@ class Transformer : public Branch {
           base_i_to_{base_power_3p / u2_rated / sqrt3},
           nominal_ratio_{u1_rated / u2_rated},
           z_grounding_from_{
-              get_z_grounding(transformer_input.r_grounding_from, transformer_input.x_grounding_from, u1_rated)},
+              calculate_z_pu(transformer_input.r_grounding_from, transformer_input.x_grounding_from, u1_rated)},
           z_grounding_to_{
-              get_z_grounding(transformer_input.r_grounding_to, transformer_input.x_grounding_to, u2_rated)} {
+              calculate_z_pu(transformer_input.r_grounding_to, transformer_input.x_grounding_to, u2_rated)} {
         // check on clock
         bool const is_from_wye = winding_from_ == WindingType::wye || winding_from_ == WindingType::wye_n;
         bool const is_to_wye = winding_to_ == WindingType::wye || winding_to_ == WindingType::wye_n;
@@ -103,7 +103,7 @@ class Transformer : public Branch {
     UpdateChange update(TransformerUpdate const& update) {
         assert(update.id == id());
         bool topo_changed = set_status(update.from_status, update.to_status);
-        bool param_changed = set_tap(update.tap_pos);
+        bool param_changed = set_tap(update.tap_pos) || topo_changed;
         return {topo_changed, param_changed};
     }
 
@@ -126,8 +126,8 @@ class Transformer : public Branch {
     double nominal_ratio_;
     DoubleComplex z_grounding_from_, z_grounding_to_;
 
-    // calculate z grounding with NaN detection and per unit
-    DoubleComplex get_z_grounding(double r, double x, double u) {
+    // calculate z in per unit with NaN detection
+    DoubleComplex calculate_z_pu(double r, double x, double u) {
         r = is_nan(r) ? 0 : r;
         x = is_nan(x) ? 0 : x;
         double const base_z = u * u / base_power_3p;
@@ -152,7 +152,7 @@ class Transformer : public Branch {
             else {
                 u2 += tap_direction_ * (tap_pos_ - tap_nom_) * tap_size_;
             }
-            return std::pair<double, double>{u1, u2};
+            return std::pair{u1, u2};
         }();
         double const k = (u1 / u2) / nominal_ratio_;
         // pk and uk
